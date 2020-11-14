@@ -17,7 +17,6 @@ Still to come:
 * more entries in the database
 * customize: fatten mounting tabs
 * customize: choose mounting bolts in more detail, maybe captive nut)
-* customize: compensate printing size
 
  random links:
 	https://servodatabase.com/
@@ -42,7 +41,7 @@ Small_Servo = 2; // [0:None, 1:HS5805MG, 2:DS3218]
 Mount_Small_Servo = 0; // [0:from the top, 1:from the bottom, 2:clam shell]
 
 // draw only the part that is needed to function as an adapter
-Draw_Mount = 0; // [0:full servo, 1: top half, 2: small servo height, 3:minimal, 4:minimal plus]
+Draw_Adapter = 0; // [0:full servo, 1: top half, 2: small servo height, 3:minimal, 4:minimal plus]
 
 // useful in clam shell mode
 Draw_Sides = 0; // [0:both sides, 1:left side, 2:right side]
@@ -55,10 +54,16 @@ Draw_Servo_Wheel = 0; // [0:auto, 1:no, 2:yes, 3:clipped]
 // Fit adapter into scaled models (%)
 Large_Servo_Scale = 100.0;
 
+// adjust servo size to 3d printer imprecisions 
+Large_Servo_Adjust = 0.0; // [-2.0:0.05:2.0]
+
 // create a channel to route the cable away from the adapter
 Large_Servo_Cable_Channel = 0; // [0:no, 1:yes]
 
 /* [Small Servo Settings] */
+
+// adjust servo size to 3d printer imprecisions 
+Small_Servo_Adjust = 0.0; // [-2.0:0.05:2.0]
 
 // create a channel to route the cable through the adapter
 Small_Servo_Cable_Channel = 1; // [0:no, 1:yes]
@@ -357,12 +362,19 @@ module draw_body_for_servo_type_1(servo, style=kStyleDraw)
 	offset = servo[3];
 	mount_offset = servo[5];
 	type = body[0];
-	size = body[1];
+	
+	// adjust body size for 3d printer imprecissions
+	adj = (style==kStyleDraw) ? Large_Servo_Adjust : Small_Servo_Adjust;
+	os = body[1];
+	echo(os);
+	size = [os[0]+2*adj, os[1]+2*adj, os[2]+2*adj];
+	echo(adj, size);
+
 	cbox_chamfer = style==kStyleDraw ? 1.0 : 0.1;
 	if (type==1) { // body: chamfered box
 		difference() {
 			translate([size[0]/2-offset[0], offset[1], size[2]/2-offset[2]])
-				cbox(body[1], cbox_chamfer);
+				cbox(size, cbox_chamfer);
 			if (style==kStyleDraw && Large_Servo_Cable_Channel==1) {
 				// half pipe going down the left side fitting the R/C cable
 				translate([-offset[0], offset[1], -100-mount_offset])
@@ -381,7 +393,12 @@ module draw_mount_for_servo_type_1(servo, style=kStyleDraw)
 	body = servo[2];
 	size = body[1];
 	offset = servo[3];
-	mount = servo[4];
+	
+	// adjust mount size for 3d printer imprecissions
+	adj = (style==kStyleDraw) ? Large_Servo_Adjust : Small_Servo_Adjust;
+	om = servo[4];
+	mount = [om[0], [om[1][0]+2*adj, om[1][1]+2*adj, om[1][2]], om[2], om[3], om[4]];
+	
 	mount_offset = servo[5];
 	type = mount[0];
 	fbox_chamfer = style==kStyleDraw ? size[1]/8 : 0.1;
@@ -563,7 +580,7 @@ module clip_y()
  * Z-Clipping reduces the model to the minimal shape that is needed
  * for a servo adapter.
  *
- * Draw_Mount = 0; // [0:full servo, 1: top half, 2: small servo height, 3:minimal, 4:minimal plus]
+ * Draw_Adapter = 0; // [0:full servo, 1: top half, 2: small servo height, 3:minimal, 4:minimal plus]
  * 
  * TODO: this module does not take the type of servo elements into account.
  *       It might make sense to write functions that find these secific measurements.
@@ -576,19 +593,19 @@ module clip_z()
 	// ---- draw the top clipping box
 	// draw a large cube that clips everything above the top of
 	// the small servo mount
-	if (s_servo!=undef && (Draw_Mount==3 || Draw_Mount==4)) {
+	if (s_servo!=undef && (Draw_Adapter==3 || Draw_Adapter==4)) {
 		s_servo_top = -s_servo[5]+s_servo[4][1][2];
 		echo(s_servo, s_servo_top);
 		translate([0, 0, 100+s_servo_top])
 			cube(200, center=true);
 	}
 	// draw a large cube that clips the lower half of the mount
-	if (l_servo!=undef && (Draw_Mount==1 || Draw_Mount==3 || Draw_Mount==4)) {
+	if (l_servo!=undef && (Draw_Adapter==1 || Draw_Adapter==3 || Draw_Adapter==4)) {
 		// clip belom the large servo mount
-		l_servo_bot = -l_servo[5]*scl - ((Draw_Mount==4) ? 10 : 0);
+		l_servo_bot = -l_servo[5]*scl - ((Draw_Adapter==4) ? 10 : 0);
 		translate([0, 0, l_servo_bot-100])
 			cube(200, center=true);
-	} else if (s_servo!=undef && Draw_Mount==2) {
+	} else if (s_servo!=undef && Draw_Adapter==2) {
 		// clip belom the small servo case
 		s_servo_bot = -s_servo[3][2];
 		translate([0, 0, s_servo_bot-100])
